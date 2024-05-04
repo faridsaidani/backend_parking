@@ -2,8 +2,6 @@ from flask import request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import app, db
 from models import Utilisateur, Facture, Entree_Sortie, Vehicule
-from datetime import datetime, timezone
-# import str
 
 
 @app.route('/vehicules', methods=['GET'])
@@ -17,6 +15,8 @@ def get_vehicules():
 @app.route('/vehicules', methods=['POST'])
 def add_vehicule():
     data = request.get_json()
+    if not session['logged_in']:
+        return jsonify({'message': 'You are not logged in'}), 401
     vehicule = Vehicule(numero_immatriculation=data['numero_immatriculation'], marque=data['marque'], modele=data['modele'], couleur=data['couleur'], annee=data['annee'], photos=data['photos'], propietaire=data['propietaire'])
     vehicule.save()
     return jsonify(vehicule), 201
@@ -24,11 +24,19 @@ def add_vehicule():
 @app.route('/vehicules/<numero_immatriculation>', methods=['GET'])
 def get_vehicule(numero_immatriculation):
     vehicule = Vehicule.objects(numero_immatriculation=numero_immatriculation).first()
+    if not vehicule:
+        return jsonify({'message': 'Vehicule not found'}), 404
+    if session['user_id'] != vehicule.propietaire:
+        return jsonify({'message': 'You are not authorized to view this vehicule'}), 403
     return jsonify(vehicule), 200
 
 @app.route('/vehicules/<numero_immatriculation>', methods=['PUT'])
 def update_vehicule(numero_immatriculation):
     data = request.get_json()
+    if not session['logged_in']:
+        return jsonify({'message': 'You are not logged in'}), 401
+    if session['user_id'] != Vehicule.objects(numero_immatriculation=numero_immatriculation).first().propietaire:
+        return jsonify({'message': 'You are not authorized to update this vehicule'}), 403
     vehicule = Vehicule.objects(numero_immatriculation=numero_immatriculation).first()
     vehicule.marque = data.get('marque', vehicule.marque)
     vehicule.modele = data.get('modele', vehicule.modele)
@@ -41,13 +49,20 @@ def update_vehicule(numero_immatriculation):
 @app.route('/vehicules/<numero_immatriculation>', methods=['DELETE'])
 def delete_vehicule(numero_immatriculation):
     vehicule = Vehicule.objects(numero_immatriculation=numero_immatriculation).first()
+    if not vehicule:
+        return jsonify({'message': 'Vehicule not found'}), 404
+    if session['user_id'] != vehicule.propietaire:
+        return jsonify({'message': 'You are not authorized to delete this vehicule'}), 403
     vehicule.delete()
     return jsonify({'message': 'Deleted successfully'}), 200
 
 @app.route('/factures', methods=['GET'])
 def get_factures():
     factures = Facture.query.all()
-    print(factures)
+    if not factures:
+        return jsonify({'message': 'No factures found'}), 404
+    if session['user_id'] != 1:
+        factures = [facture.to_dict() for facture in factures if facture.id_utilisateur == session['user_id']]
     factures = [facture.to_dict() for facture in factures]
     return jsonify(factures), 200
 
@@ -62,11 +77,21 @@ def add_facture():
 @app.route('/factures/<id>', methods=['GET'])
 def get_facture(id):
     facture = Facture.query.get(id)
+    if not facture:
+        return jsonify({'message': 'Facture not found'}), 404
+    if (facture.id_utilisateur != session['user_id']) or (session['user_id'] != 1):
+        return jsonify({'message': 'You are not authorized to view this Facture'}), 403
     return jsonify(facture), 200
 
 @app.route('/factures/<id>', methods=['PUT'])
 def update_facture(id):
     data = request.get_json()
+    if not session['logged_in']:
+        return jsonify({'message': 'You are not logged in'}), 401
+    if session['user_id'] != 1:
+        facture = Facture.query.get(id)
+        if (facture.id_utilisateur != session['user_id']):
+            return jsonify({'message': 'You are not authorized to update this Facture'}), 403
     facture = Facture.query.get(id)
     facture.id_utilisateur = data.get('id_utilisateur', facture.id_utilisateur)
     facture.entree_sortie = data.get('entree_sortie', facture.entree_sortie)
@@ -78,14 +103,15 @@ def update_facture(id):
 @app.route('/factures/<id>', methods=['DELETE'])
 def delete_facture(id):
     facture = Facture.query.get(id)
+    if not facture:
+        return jsonify({'message': 'Facture not found'}), 404
+    if (facture.id_utilisateur != session['user_id']) or (session['user_id'] != 1):
+        return jsonify({'message': 'You are not authorized to delete this Facture'}), 403
+    
     db.session.delete(facture)
     db.session.commit()
     return jsonify({'message': 'Deleted successfully'}), 200
 
-@app.route('/factures/user/<id_utilisateur>', methods=['GET'])
-def get_factures_by_user(id_utilisateur):
-    factures = Facture.query.filter_by(id_utilisateur=id_utilisateur).all()
-    return jsonify(factures), 200
 
 @app.route('/entrees_sorties', methods=['GET'])
 def get_entrees_sorties():
@@ -97,9 +123,7 @@ def get_entrees_sorties():
 @app.route('/entrees_sorties', methods=['POST'])
 def add_entree_sortie():
     data = request.get_json()
-    heure_entree = datetime.strptime(str(datetime.strptime(data['heure_entree'], '%Y-%m-%dT%H:%M:%SZ')), '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
-    heure_sortie = datetime.strptime(str(datetime.strptime(data['heure_sortie'], '%Y-%m-%dT%H:%M:%SZ')), '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
-    new_entree_sortie = Entree_Sortie(numero_immatriculation=data['numero_immatriculation'], heure_entree=heure_entree, heure_sortie=heure_sortie, photo_entree=data['photo_entree'], photo_sortie=data['photo_sortie'])
+    new_entree_sortie = Entree_Sortie(numero_immatriculation=data['numero_immatriculation'], heure_entree=data["heure_entree"], heure_sortie=data["heure_sortie"], photo_entree=data['photo_entree'], photo_sortie=data['photo_sortie'])
     db.session.add(new_entree_sortie)
     db.session.commit()
     return jsonify(new_entree_sortie.to_dict()), 201
@@ -114,6 +138,8 @@ def get_entree_sortie(id):
 def update_entree_sortie(id):
     data = request.get_json()
     entree_sortie = Entree_Sortie.query.get(id)
+    if not entree_sortie:
+        return jsonify({'message': 'Entree_Sortie not found'}), 404
     entree_sortie.numero_immatriculation = data.get('numero_immatriculation', entree_sortie.numero_immatriculation)
     entree_sortie.heure_entree = data.get('heure_entree', entree_sortie.heure_entree)
     entree_sortie.heure_sortie = data.get('heure_sortie', entree_sortie.heure_sortie)
@@ -125,6 +151,8 @@ def update_entree_sortie(id):
 @app.route('/entrees_sorties/<id>', methods=['DELETE'])
 def delete_entree_sortie(id):
     entree_sortie = Entree_Sortie.query.get(id)
+    if not entree_sortie:
+        return jsonify({'message': 'Entree_Sortie not found'}), 404
     db.session.delete(entree_sortie)
     db.session.commit()
     return jsonify({'message': 'Deleted successfully'}), 200
@@ -132,11 +160,20 @@ def delete_entree_sortie(id):
 @app.route('/entrees_sorties/vehicule/<numero_immatriculation>', methods=['GET'])
 def get_entrees_sorties_by_vehicle(numero_immatriculation):
     entrees_sorties = Entree_Sortie.query.filter_by(numero_immatriculation=numero_immatriculation).all()
+    if not entrees_sorties:
+        return jsonify({'message': 'No entrees_sorties found'}), 404
+    if session['user_id'] != 1:
+        entrees_sorties = [entree_sortie.to_dict() for entree_sortie in entrees_sorties if entree_sortie.id_utilisateur == session['user_id']]
+    entrees_sorties = [entree_sortie.to_dict() for entree_sortie in entrees_sorties]
     return jsonify(entrees_sorties), 200
 
 @app.route('/entrees_sorties/vehicule/<numero_immatriculation>', methods=['DELETE'])
 def delete_entrees_sorties_by_vehicle(numero_immatriculation):
     entrees_sorties = Entree_Sortie.query.filter_by(numero_immatriculation=numero_immatriculation).all()
+    if session['user_id'] != 1:
+        return jsonify({'message': 'You are not authorized to delete these entrees_sorties'}), 403
+    if not entrees_sorties:
+        return jsonify({'message': 'No entrees_sorties found'}), 404
     for entree_sortie in entrees_sorties:
         db.session.delete(entree_sortie)
     db.session.commit()
@@ -219,16 +256,6 @@ def get_user_cars(id):
             cars = Vehicule.objects(propietaire=id)
             cars = [car.to_dict() for car in cars]
             return jsonify(cars), 200
-    return {"message": "You are not authorized to view this page"}, 403
-
-# create a route that let me see all the invoices of a user
-@app.route('/users/<id>/invoices', methods=['GET'])
-def get_user_invoices(id):
-    if 'logged_in' in session and session['logged_in']:
-        if session['user_id'] == 1:
-            invoices = Facture.query.filter_by(id_utilisateur=id).all()
-            invoices = [invoice.to_dict() for invoice in invoices]
-            return jsonify(invoices), 200
     return {"message": "You are not authorized to view this page"}, 403
 
 # create a route that let me see all the entries and exits of a user
