@@ -9,6 +9,9 @@ from datetime import datetime, timezone
 @app.route('/vehicules', methods=['GET'])
 def get_vehicules():
     vehicules = Vehicule.objects()
+    vehicules = [vehicule.to_dict() for vehicule in vehicules if vehicule.propietaire == session["user_id"]]
+    if not vehicules:
+        return jsonify({'message': 'No vehicules found'}), 404
     return jsonify(vehicules), 200
 
 @app.route('/vehicules', methods=['POST'])
@@ -148,6 +151,10 @@ def home():
 def register():
     data = request.get_json()
     hashed_password = generate_password_hash(data['mot_de_passe'], method='sha256')
+    # check if the provided email already exists
+    user = Utilisateur.query.filter_by(email=data['email']).first()
+    if user:
+        return jsonify({'message': 'Email already exists'}), 400
     new_user = Utilisateur(nom_complet=data['nom_complet'], email=data['email'], mot_de_passe=hashed_password, numero_de_telephone=data['numero_de_telephone'], information_bancaires=data['information_bancaires'])
     db.session.add(new_user)
     db.session.commit()
@@ -160,7 +167,7 @@ def login():
     if user and check_password_hash(user.mot_de_passe, data['mot_de_passe']):
         session['logged_in'] = True
         session['user_id'] = user.id
-        return jsonify({'message': 'Logged in successfully'}), 200
+        return jsonify({'message': 'Logged in successfully', "uid" : user.id}), 200
     else:
         return jsonify({'message': 'Invalid email or password'}), 401
 
@@ -183,3 +190,22 @@ def update():
         return jsonify({'message': 'Updated successfully'}), 200
     else:
         return jsonify({'message': 'You are not logged in'}), 401
+
+@app.route('/delete', methods=['DELETE'])
+def delete():
+    if 'logged_in' in session and session['logged_in']:
+        user = Utilisateur.query.get(session['user_id'])
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({'message': 'Deleted successfully'}), 200
+    else:
+        return jsonify({'message': 'You are not logged in'}), 401
+    
+@app.route('/users', methods=['GET'])
+def get_users():
+    if 'logged_in' in session and session['logged_in']:
+        if session['user_id'] == 1:    
+            users = Utilisateur.query.all()
+            users = [user.to_dict() for user in users]
+            return jsonify(users), 200
+    return {"message": "You are not authorized to view this page"}, 403

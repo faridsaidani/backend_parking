@@ -3,10 +3,18 @@ from app import db, mongo
 class Utilisateur(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nom_complet = db.Column(db.String(255), nullable=False)
-    email = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255), nullable=False, unique=True)
     mot_de_passe = db.Column(db.String(255), nullable=False)
     numero_de_telephone = db.Column(db.String(20), nullable=False)
     information_bancaires = db.Column(db.String(255), nullable=True)
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nom_complet': self.nom_complet,
+            'email': self.email,
+            'numero_de_telephone': self.numero_de_telephone,
+            'information_bancaires': self.information_bancaires,
+        }
 
 class Facture(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -49,4 +57,14 @@ class Vehicule(mongo.Document):
     annee = mongo.IntField(required=True)
     photos = mongo.ListField(mongo.StringField(), required=True)
     propietaire = mongo.IntField(required=True)
+    def to_dict(self):
+        return {
+            'numero_immatriculation': self.numero_immatriculation,
+            'marque': self.marque,
+            'modele': self.modele,
+            'couleur': self.couleur,
+            'annee': self.annee,
+            'photos': self.photos,
+            'propietaire': self.propietaire,
+        }
 

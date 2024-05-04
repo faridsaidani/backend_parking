@@ -3,10 +3,12 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_mongoengine import MongoEngine
 from dotenv import load_dotenv
 import os
+from flask_cors import CORS
 
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 # set the secret key from environment variable
 app.secret_key = os.environ.get('SECRET_KEY')
 
