@@ -4,13 +4,15 @@ from app import app, db, mongo
 from models import Utilisateur, Facture, Entree_Sortie, Vehicule
 
 
-@app.route('/vehicules', methods=['GET'])
-def get_vehicules():
+@app.route('/vehicules/<id>', methods=['GET'])
+def get_vehicules(id):
     vehicules = Vehicule.objects()
-    vehicules = [vehicule.to_dict() for vehicule in vehicules if vehicule.propietaire == session["user_id"]]
+    vehicules = [vehicule.to_dict() for vehicule in vehicules if vehicule['propietaire'] == int(id)]
     if not vehicules:
         return jsonify({'message': 'No vehicules found'}), 404
     return jsonify(vehicules), 200
+
+
 
 @app.route('/vehicules', methods=['POST'])
 def add_vehicule():
@@ -35,7 +37,7 @@ def update_vehicule(numero_immatriculation):
     data = request.get_json()
     if not session['logged_in']:
         return jsonify({'message': 'You are not logged in'}), 401
-    if session['user_id'] != Vehicule.objects(numero_immatriculation=numero_immatriculation).first().propietaire:
+    if (session['user_id'] != Vehicule.objects(numero_immatriculation=numero_immatriculation).first().propietaire) or (session['user_id'] != 1):
         return jsonify({'message': 'You are not authorized to update this vehicule'}), 403
     vehicule = Vehicule.objects(numero_immatriculation=numero_immatriculation).first()
     vehicule.marque = data.get('marque', vehicule.marque)
@@ -204,7 +206,7 @@ def login():
     if user and check_password_hash(user.mot_de_passe, data['mot_de_passe']):
         session['logged_in'] = True
         session['user_id'] = user.id
-        return jsonify({'message': 'Logged in successfully', "uid" : user.id}), 200
+        return jsonify({'message': 'Logged in successfully', "uid" : user.id, "username" : user.nom_complet}), 200
     else:
         return jsonify({'message': 'Invalid email or password'}), 401
 
@@ -237,7 +239,19 @@ def delete():
         return jsonify({'message': 'Deleted successfully'}), 200
     else:
         return jsonify({'message': 'You are not logged in'}), 401
-    
+
+@app.route('/user/<id>', methods=['GET'])
+def get_user(id):
+    # if 'logged_in' in session and session['logged_in']:
+    #     if session['user_id'] == 1 or session['user_id'] == id:
+    user = Utilisateur.query.get(id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    return jsonify(user.to_dict()), 200
+    # return {"message": "You are not authorized to view this page"}, 403
+
+
+
 @app.route('/users', methods=['GET'])
 def get_users():
     if 'logged_in' in session and session['logged_in']:
@@ -271,12 +285,12 @@ def get_user_entrees_sorties(id):
 # create a route that let me see all the invoices of a user
 @app.route('/users/<id>/invoices', methods=['GET'])
 def get_user_invoices(id):
-    if 'logged_in' in session and session['logged_in']:
-        if session['user_id'] == 1:
-            invoices = Facture.query.filter_by(id_utilisateur=id).all()
-            invoices = [invoice.to_dict() for invoice in invoices]
-            return jsonify(invoices), 200
-    return {"message": "You are not authorized to view this page"}, 403
+    # if 'logged_in' in session and session['logged_in']:
+    #     if session['user_id'] == 1:
+    invoices = Facture.query.filter_by(id_utilisateur=int(id)).all()
+    invoices = [invoice.to_dict() for invoice in invoices]
+    return jsonify(invoices), 200
+    # return {"message": "You are not authorized to view this page"}, 403
 
 # create a route that will let me flush the database
 @app.route('/flush', methods=['DELETE'])
@@ -286,4 +300,14 @@ def flush():
             db.drop_all()
             db.create_all()
             return {"message": "Database flushed successfully"}, 200
+    return {"message": "You are not authorized to view this page"}, 403
+
+# create a route that will show me all the cars
+@app.route('/cars', methods=['GET'])
+def get_cars():
+    if 'logged_in' in session and session['logged_in']:
+        if session['user_id'] == 1:
+            cars = Vehicule.objects()
+            cars = [car.to_dict() for car in cars]
+            return jsonify(cars), 200
     return {"message": "You are not authorized to view this page"}, 403
