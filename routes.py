@@ -209,3 +209,44 @@ def get_users():
             users = [user.to_dict() for user in users]
             return jsonify(users), 200
     return {"message": "You are not authorized to view this page"}, 403
+
+# create admin routes that let me access to all cars, all invoices, all entries and exits and all users
+# create a route that let me see all the cars of a user
+@app.route('/users/<id>/cars', methods=['GET'])
+def get_user_cars(id):
+    if 'logged_in' in session and session['logged_in']:
+        if session['user_id'] == 1:
+            cars = Vehicule.objects(propietaire=id)
+            cars = [car.to_dict() for car in cars]
+            return jsonify(cars), 200
+    return {"message": "You are not authorized to view this page"}, 403
+
+# create a route that let me see all the invoices of a user
+@app.route('/users/<id>/invoices', methods=['GET'])
+def get_user_invoices(id):
+    if 'logged_in' in session and session['logged_in']:
+        if session['user_id'] == 1:
+            invoices = Facture.query.filter_by(id_utilisateur=id).all()
+            invoices = [invoice.to_dict() for invoice in invoices]
+            return jsonify(invoices), 200
+    return {"message": "You are not authorized to view this page"}, 403
+
+# create a route that let me see all the entries and exits of a user
+@app.route('/users/<id>/entrees_sorties', methods=['GET'])
+def get_user_entrees_sorties(id):
+    if 'logged_in' in session and session['logged_in']:
+        if session['user_id'] == 1:
+            entrees_sorties = Entree_Sortie.query.filter_by(id_utilisateur=id).all()
+            entrees_sorties = [entree_sortie.to_dict() for entree_sortie in entrees_sorties]
+            return jsonify(entrees_sorties), 200
+    return {"message": "You are not authorized to view this page"}, 403
+
+# create a route that let me see all the invoices of a user
+@app.route('/users/<id>/invoices', methods=['GET'])
+def get_user_invoices(id):
+    if 'logged_in' in session and session['logged_in']:
+        if session['user_id'] == 1:
+            invoices = Facture.query.filter_by(id_utilisateur=id).all()
+            invoices = [invoice.to_dict() for invoice in invoices]
+            return jsonify(invoices), 200
+    return {"message": "You are not authorized to view this page"}, 403
