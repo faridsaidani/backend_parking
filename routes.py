@@ -1,6 +1,6 @@
 from flask import request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
-from app import app, db
+from app import app, db, mongo
 from models import Utilisateur, Facture, Entree_Sortie, Vehicule
 
 
@@ -276,4 +276,14 @@ def get_user_invoices(id):
             invoices = Facture.query.filter_by(id_utilisateur=id).all()
             invoices = [invoice.to_dict() for invoice in invoices]
             return jsonify(invoices), 200
+    return {"message": "You are not authorized to view this page"}, 403
+
+# create a route that will let me flush the database
+@app.route('/flush', methods=['DELETE'])
+def flush():
+    if 'logged_in' in session and session['logged_in']:
+        if session['user_id'] == 1:
+            db.drop_all()
+            db.create_all()
+            return {"message": "Database flushed successfully"}, 200
     return {"message": "You are not authorized to view this page"}, 403

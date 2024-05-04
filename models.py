@@ -5,7 +5,7 @@ class Utilisateur(db.Model):
     nom_complet = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), nullable=False, unique=True)
     mot_de_passe = db.Column(db.String(255), nullable=False)
-    numero_de_telephone = db.Column(db.String(20), nullable=False)
+    numero_de_telephone = db.Column(db.String(40), nullable=False)
     information_bancaires = db.Column(db.String(255), nullable=True)
     def to_dict(self):
         return {
@@ -44,8 +44,8 @@ class Entree_Sortie(db.Model):
             'numero_immatriculation': self.numero_immatriculation,
             'heure_entree': self.heure_entree.isoformat(),
             'heure_sortie': self.heure_sortie.isoformat(),
-            'photo_entree': self.photo_entree.decode('utf-8'),
-            'photo_sortie': self.photo_sortie.decode('utf-8'),
+            'photo_entree': self.photo_entree,
+            'photo_sortie': self.photo_sortie,
         }
 
 
