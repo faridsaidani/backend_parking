@@ -18,7 +18,7 @@ with app.app_context():
         passw = fake.password()
         num = fake.phone_number()[:15]
         infos = fake.credit_card_number()
-        pd.concat([df, pd.DataFrame([name, email, passw, num,infos])], ignore_index=True)
+        df = df.append({'name': name, 'email': email, 'password': passw, 'phone_number': num, 'credit_card_number': infos}, ignore_index=True)
         hashed_pass = generate_password_hash(passw, method='sha256')
         utilisateur = Utilisateur(
             nom_complet=name,
