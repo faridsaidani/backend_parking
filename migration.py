@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from models_sql import Vehicule as VehiculeSQL
+from models import Vehicule as VehiculeSQL
 
 # Set up MongoDB connection
 mongo_client = MongoClient('mongodb://localhost:27017/')
