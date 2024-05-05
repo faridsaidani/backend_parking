@@ -2,14 +2,25 @@ from pymongo import MongoClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models import Vehicule as VehiculeSQL
+from dotenv import load_dotenv
+import os
 
-# Set up MongoDB connection
-mongo_client = MongoClient('mongodb://localhost:27017/')
-mongo_db = mongo_client['your_mongodb_database']
+load_dotenv()
+
+user = os.environ.get('DB_USER')
+password = os.environ.get('DB_PASSWORD')
+dbName = os.environ.get('DB_NAME')
+
+mongo_db = os.environ.get('MONGO_DB')
+mongo_host = os.environ.get('MONGO_HOST')
+mongo_port = int(os.environ.get('MONGO_PORT'))
+
+mongo_client = MongoClient(f'mongodb://{mongo_host}:{mongo_port}/')
+mongo_db = mongo_client[mongo_db]
 mongo_collection = mongo_db['Vehicule']
 
 # Set up SQL connection
-engine = create_engine('mysql://username:password@localhost/your_sql_database')
+engine = create_engine('mysql://{user}:{password}@localhost/{dbName}')
 Session = sessionmaker(bind=engine)
 session = Session()
 
