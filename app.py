@@ -16,13 +16,13 @@ app.secret_key = os.environ.get('SECRET_KEY')
 user = os.environ.get('DB_USER')
 password = os.environ.get('DB_PASSWORD')
 dbName = os.environ.get('DB_NAME')
+db_host = os.environ.get('DB_HOST')
 
 # MySQL Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql://{user}:{password}@localhost/{dbName}'
+app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql://{user}:{password}@{db_host}/{dbName}'
 
 
 # MySQL Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql://{user}:{password}@localhost/ParkingDatabase'
 db = SQLAlchemy(app)
 
 

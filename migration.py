@@ -10,7 +10,6 @@ load_dotenv()
 user = os.environ.get('DB_USER')
 password = os.environ.get('DB_PASSWORD')
 dbName = os.environ.get('DB_NAME')
-
 mongo_db = os.environ.get('MONGO_DB')
 mongo_host = os.environ.get('MONGO_HOST')
 mongo_port = int(os.environ.get('MONGO_PORT'))
@@ -19,7 +18,6 @@ mongo_client = MongoClient(f'mongodb://{mongo_host}:{mongo_port}/')
 mongo_db = mongo_client[mongo_db]
 mongo_collection = mongo_db['Vehicule']
 
-# Set up SQL connection
 engine = create_engine('mysql://{user}:{password}@localhost/{dbName}')
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -36,9 +34,7 @@ for document in mongo_collection.find():
         photos=document.get('photos'),
         propietaire=document.get('propietaire'),
     )
-
     # Insert data into SQL
     session.add(vehicule)
 
-# Commit the changes
 session.commit()
