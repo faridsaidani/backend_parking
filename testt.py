@@ -1,3 +1,3 @@
-from bib import get_entree_sortie
+from bib import process_all_vehicles
 
-get_entree_sortie()
+process_all_vehicles()

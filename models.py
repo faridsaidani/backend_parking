@@ -18,18 +18,23 @@ class Utilisateur(db.Model):
             'solde' : self.solde
         }
 
-class Facture(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    id_utilisateur = db.Column(db.Integer, db.ForeignKey('utilisateur.id'), nullable=False)
-    entree_sortie = db.Column(db.Integer, nullable=False)
-    montant_a_regler = db.Column(db.Float, nullable=False)
-    regle = db.Column(db.Boolean, default=False)
+class Facture(mongo.Document):
+    id_utilisateur = mongo.IntField(required=True)
+    numero_immatriculation = mongo.StringField(required=True)
+    heure_entree = mongo.DateTimeField(required=True)
+    heure_sortie = mongo.DateTimeField(required=True)
+    tarif = mongo.FloatField(required=True)
+    total_cost = mongo.FloatField(required=True)
+    regle = mongo.BooleanField(default=False)
     def to_dict(self):
         return {
-            'id': self.id,
+            'id': str(self.id),
             'id_utilisateur': self.id_utilisateur,
-            'entree_sortie': self.entree_sortie,
-            'montant_a_regler': self.montant_a_regler,
+            'heure_entree': self.heure_entree,
+            'heure_sortie': self.heure_sortie,
+            'tarif': self.tarif,
+            'total_cost': self.total_cost,
+            'numero_immatriculation': self.numero_immatriculation,
             'regle': self.regle,
         }
 

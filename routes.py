@@ -5,6 +5,7 @@ from models import Utilisateur, Facture, Entree_Sortie, Vehicule
 from datetime import datetime
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+from bib import *
 
 
 @app.route('/vehicules/<id>', methods=['GET'])
@@ -70,63 +71,32 @@ def delete_vehicule(numero_immatriculation):
     vehicule.delete()
     return jsonify({'message': 'Deleted successfully'}), 200
 
+@app.route('/factures', methods=['POST'])
+def create_facture():
+    data = request.get_json()
+    facture = Facture(**data).save()
+    return jsonify(facture.to_dict()), 201
+
 @app.route('/factures', methods=['GET'])
 def get_factures():
-    factures = Facture.query.all()
-    if not factures:
-        return jsonify({'message': 'No factures found'}), 404
-    if session['user_id'] != 1:
-        factures = [facture.to_dict() for facture in factures if facture.id_utilisateur == session['user_id']]
-    factures = [facture.to_dict() for facture in factures]
-    return jsonify(factures), 200
-
-@app.route('/factures', methods=['POST'])
-def add_facture():
-    data = request.get_json()
-    new_facture = Facture(id_utilisateur=data['id_utilisateur'], entree_sortie=data['entree_sortie'], montant_a_regler=data['montant_a_regler'], regle=data['regle'])
-    db.session.add(new_facture)
-    db.session.commit()
-    return jsonify(new_facture.to_dict()), 201
+    factures = Facture.objects()
+    return jsonify([facture.to_dict() for facture in factures]), 200
 
 @app.route('/factures/<id>', methods=['GET'])
 def get_facture(id):
-    facture = Facture.query.get(id)
-    if not facture:
-        return jsonify({'message': 'Facture not found'}), 404
-    if (facture.id_utilisateur != session['user_id']) or (session['user_id'] != 1):
-        return jsonify({'message': 'You are not authorized to view this Facture'}), 403
-    return jsonify(facture), 200
+    facture = Facture.objects.get_or_404(id=id)
+    return jsonify(facture.to_dict()), 200
 
 @app.route('/factures/<id>', methods=['PUT'])
 def update_facture(id):
     data = request.get_json()
-    if not session['logged_in']:
-        return jsonify({'message': 'You are not logged in'}), 401
-    if session['user_id'] != 1:
-        facture = Facture.query.get(id)
-        if (facture.id_utilisateur != session['user_id']):
-            return jsonify({'message': 'You are not authorized to update this Facture'}), 403
-    facture = Facture.query.get(id)
-    facture.id_utilisateur = data.get('id_utilisateur', facture.id_utilisateur)
-    facture.entree_sortie = data.get('entree_sortie', facture.entree_sortie)
-    facture.montant_a_regler = data.get('montant_a_regler', facture.montant_a_regler)
-    facture.regle = data.get('regle', facture.regle)
-    db.session.commit()
-    return jsonify(facture.to_dict()), 200
+    Facture.objects(id=id).update(**data)
+    return '', 204
 
 @app.route('/factures/<id>', methods=['DELETE'])
 def delete_facture(id):
-    facture = Facture.query.get(id)
-    if not facture:
-        return jsonify({'message': 'Facture not found'}), 404
-    if (facture.id_utilisateur != session['user_id']) or (session['user_id'] != 1):
-        return jsonify({'message': 'You are not authorized to delete this Facture'}), 403
-    
-    db.session.delete(facture)
-    db.session.commit()
-    return jsonify({'message': 'Deleted successfully'}), 200
-
-
+    Facture.objects(id=id).delete()
+    return '', 204
 @app.route('/entrees_sorties', methods=['GET'])
 def get_entrees_sorties():
     entrees_sorties = Entree_Sortie.query.all()
@@ -143,7 +113,7 @@ def add_entree_sortie():
     return jsonify(new_entree_sortie.to_dict()), 201
 
 @app.route('/entrees_sorties/<id>', methods=['GET'])
-def get_entree_sortie(id):
+def get_entree_sortie_by_id(id):
     entree_sortie = Entree_Sortie.query.get(id)
     return jsonify(entree_sortie), 200
 
@@ -284,7 +254,7 @@ def pay_invoice(id, id_invoice, sum):
         return jsonify({'message': 'User not found'}), 404
 
     # Fetch the invoice from the database
-    invoice = Facture.query.get(id_invoice)
+    invoice = Facture.objects(id=id_invoice).first()
     if not invoice:
         return jsonify({'message': 'Invoice not found'}), 404
 
@@ -301,6 +271,7 @@ def pay_invoice(id, id_invoice, sum):
 
     # Save the changes to the database
     db.session.commit()
+    invoice.save()
 
     return jsonify({'message': 'Invoice paid successfully'}), 200
 
@@ -340,7 +311,7 @@ def get_user_entrees_sorties(id):
 def get_user_invoices(id):
     # if 'logged_in' in session and session['logged_in']:
     #     if session['user_id'] == 1:
-    invoices = Facture.query.filter_by(id_utilisateur=int(id)).all()
+    invoices = Facture.objects(id_utilisateur=int(id))
     invoices = [invoice.to_dict() for invoice in invoices]
     return jsonify(invoices), 200
     # return {"message": "You are not authorized to view this page"}, 403
@@ -366,7 +337,6 @@ def get_cars():
     return {"message": "You are not authorized to view this page"}, 403
 
 
-from bib import get_entree_sortie
 # create a route the will synchronize 
 @app.route('/syncES', methods=['POST'])
 def sync():
@@ -376,57 +346,47 @@ def sync():
     try:
         get_entree_sortie()
         return {"message": "Synchronized successfully"}, 200
-    except:
+    except Exception as e:
+        print(e)
         return {"message": "An error occured"}, 500
     
 @app.route('/syncFactures', methods=['POST'])
 def syncFactures():
-    # Connection string for a local MongoDB instance
-    uri = "mongodb://localhost:27017/"
+    try :
+        sync_factures()
+        return {"message": "Factures synced successfully"}, 200
+    except Exception as e:
+        print(e)
+        return {"message": "An error occured"}, 500
 
-    # Create a new client and connect to the server
-    client = MongoClient(uri, server_api=ServerApi('1'))
 
-    # Access the database and collection
-    database = client['parkingDB']
-    entree_sortie = database['entree__sortie']
-    factures = database['factures2']
 
-    # Get all documents from entree__sortie
-    documents = entree_sortie.find()
+@app.route('/syncVehicule', methods=['POST'])
+def syncVehicule():
+    uri = "mongodb+srv://kfsaidani:saidani2003@cluster0.adfmw12.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 
-    for document in documents:
-        # Calculate the difference in minutes between heure_entree and heure_sortie
-        if isinstance(document['heure_entree'], datetime) and isinstance(document['heure_sortie'], datetime):
-            heure_entree = document['heure_entree']
-            heure_sortie = document['heure_sortie']
-        else:
-            # Convert heure_entree and heure_sortie to datetime objects
-            heure_entree = datetime.strptime(document['heure_entree'], "%Y-%m-%d %H:%M:%S.%f")
-            heure_sortie = datetime.strptime(document['heure_sortie'], "%Y-%m-%d %H:%M:%S.%f")
-        time_difference = (heure_sortie - heure_entree).total_seconds() / 60
+    try:
+        migrate_data('vehicule', uri)
+        return {"message": "Vehicules synced successfully"}, 200
+    except Exception as e:
+        print(e)
+        return {"message": "An error occured"}, 500
+        
 
-        # Apply the appropriate tariff based on the time difference
-        if time_difference < 30:
-            tarif = 1.8
-        elif 30 <= time_difference < 60:
-            tarif = 1.6
-        else:
-            tarif = 1.2
+@app.route('/synchronize', methods=['POST'])
+def synchronize():
+    try:
+        # Sync ES
+        get_entree_sortie()
 
-        # Calculate the total cost
-        total_cost = time_difference * tarif
+        # Sync Factures
+        sync_factures()
 
-        # Create an invoice for the document
-        facture = {
-            'numero_immatriculation': document['numero_immatriculation'],
-            'heure_entree': document['heure_entree'],
-            'heure_sortie': document['heure_sortie'],
-            'tarif': tarif,
-            'total_cost': total_cost
-        }
+        # Sync Vehicule
+        uri = "mongodb+srv://kfsaidani:saidani2003@cluster0.adfmw12.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+        migrate_data('vehicule', uri)
 
-        # Insert the invoice into the factures collection
-        factures.insert_one(facture)
-
-    return {"message": "Invoices synced successfully"}, 200
+        return {"message": "Synchronized successfully"}, 200
+    except Exception as e:
+        print(e)
+        return {"message": "An error occured"}, 500

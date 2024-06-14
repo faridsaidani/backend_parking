@@ -1,7 +1,42 @@
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
-from bib import export_mongo_to_json
+from bib import export_mongo_to_json, get_user_id
 import sys
+from datetime import datetime
+
+def sync_factures():
+    uri = "mongodb://localhost:27017/"
+    client = MongoClient(uri, server_api=ServerApi('1'))
+    database = client['parkingDB']
+    entree_sortie = database['entree__sortie']
+    factures = database['facture']
+    documents = entree_sortie.find()
+    for document in documents:
+        if isinstance(document['heure_entree'], datetime) and isinstance(document['heure_sortie'], datetime):
+            heure_entree = document['heure_entree']
+            heure_sortie = document['heure_sortie']
+        else:
+            heure_entree = datetime.strptime(document['heure_entree'], "%Y-%m-%d %H:%M:%S.%f")
+            heure_sortie = datetime.strptime(document['heure_sortie'], "%Y-%m-%d %H:%M:%S.%f")
+        time_difference = (heure_sortie - heure_entree).total_seconds() / 60
+        if time_difference < 30:
+            tarif = 1.8
+        elif 30 <= time_difference < 60:
+            tarif = 1.6
+        else:
+            tarif = 1.2
+        total_cost = time_difference * tarif
+        uid = get_user_id(document['numero_immatriculation'])
+        facture = {
+            'id_utilisateur' : uid,
+            'numero_immatriculation': document['numero_immatriculation'],
+            'heure_entree': document['heure_entree'],
+            'heure_sortie': document['heure_sortie'],
+            'tarif': tarif,
+            'total_cost': total_cost,
+            'regle' : False
+        }
+        factures.insert_one(facture)
 
 def migrate_data(collection_name, uri):
     data = export_mongo_to_json(collection_name)
