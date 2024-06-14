@@ -4,6 +4,8 @@ from flask_mongoengine import MongoEngine
 from dotenv import load_dotenv
 import os
 from flask_cors import CORS
+from flask_migrate import Migrate
+
 
 load_dotenv()
 
@@ -24,6 +26,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql://{user}:{password}@{db_host}/{d
 
 # MySQL Configuration
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 
 # MongoDB Configuration

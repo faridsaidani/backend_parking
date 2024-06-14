@@ -2,6 +2,9 @@ from flask import request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import app, db, mongo
 from models import Utilisateur, Facture, Entree_Sortie, Vehicule
+from datetime import datetime
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
 
 
 @app.route('/vehicules/<id>', methods=['GET'])
@@ -17,8 +20,9 @@ def get_vehicules(id):
 @app.route('/vehicules', methods=['POST'])
 def add_vehicule():
     data = request.get_json()
-    if not session['logged_in']:
-        return jsonify({'message': 'You are not logged in'}), 401
+    existing_vehicule = Vehicule.objects(numero_immatriculation=data['numero_immatriculation']).first()
+    if existing_vehicule:
+        return jsonify({'message': 'A vehicle with this registration number already exists'}), 400
     vehicule = Vehicule(numero_immatriculation=data['numero_immatriculation'], marque=data['marque'], modele=data['modele'], couleur=data['couleur'], annee=data['annee'], photos=data['photos'], propietaire=data['propietaire'])
     vehicule.save()
     return jsonify(vehicule), 201
@@ -30,6 +34,14 @@ def get_vehicule(numero_immatriculation):
         return jsonify({'message': 'Vehicule not found'}), 404
     if session['user_id'] != vehicule.propietaire:
         return jsonify({'message': 'You are not authorized to view this vehicule'}), 403
+    return jsonify(vehicule), 200
+
+
+@app.route('/vehicules', methods=['GET'])
+def get_allVehicules():
+    vehicule = Vehicule.objects()
+    if not vehicule:
+        return jsonify({'message': 'Vehicule not found'}), 404
     return jsonify(vehicule), 200
 
 @app.route('/vehicules/<numero_immatriculation>', methods=['PUT'])
@@ -194,7 +206,7 @@ def register():
     user = Utilisateur.query.filter_by(email=data['email']).first()
     if user:
         return jsonify({'message': 'Email already exists'}), 400
-    new_user = Utilisateur(nom_complet=data['nom_complet'], email=data['email'], mot_de_passe=hashed_password, numero_de_telephone=data['numero_de_telephone'], information_bancaires=data['information_bancaires'])
+    new_user = Utilisateur(nom_complet=data['nom_complet'], email=data['email'], mot_de_passe=hashed_password, numero_de_telephone=data['numero_de_telephone'], information_bancaires=data['information_bancaires'], solde=0)
     db.session.add(new_user)
     db.session.commit()
     return jsonify({'message': 'Registered successfully'}), 201
@@ -250,15 +262,56 @@ def get_user(id):
     return jsonify(user.to_dict()), 200
     # return {"message": "You are not authorized to view this page"}, 403
 
+@app.route('/user/<id>/ajouterSolde/<somme>', methods=['POST'])
+def ajouter_solde(id, somme):
+    user = Utilisateur.query.get(id)
+    if user is None:
+        return jsonify({'message': 'User not found'}), 404
+
+    if user.solde is None:
+        user.solde = 0
+
+    user.solde += int(somme)
+    db.session.commit()
+
+    return jsonify({'message': 'Solde ajouté avec succès'}), 200
+
+@app.route('/user/<id>/payInvoice/<id_invoice>/<sum>', methods=['POST'])
+def pay_invoice(id, id_invoice, sum):
+    # Fetch the user from the database
+    user = Utilisateur.query.get(id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+
+    # Fetch the invoice from the database
+    invoice = Facture.query.get(id_invoice)
+    if not invoice:
+        return jsonify({'message': 'Invoice not found'}), 404
+
+    sum = int(sum)
+    # Check if the user has enough balance to pay the invoice
+    if user.solde < sum:
+        return jsonify({'message': 'Insufficient balance'}), 400
+
+    # Deduct the sum from the user's balance
+    user.solde -= sum
+
+    # Mark the invoice as paid
+    invoice.regle = True
+
+    # Save the changes to the database
+    db.session.commit()
+
+    return jsonify({'message': 'Invoice paid successfully'}), 200
 
 
 @app.route('/users', methods=['GET'])
 def get_users():
-    if 'logged_in' in session and session['logged_in']:
-        if session['user_id'] == 1:    
-            users = Utilisateur.query.all()
-            users = [user.to_dict() for user in users]
-            return jsonify(users), 200
+    # if 'logged_in' in session and session['logged_in']:
+        # if session[é'user_id'] == 1:    
+    users = Utilisateur.query.all()
+    users = [user.to_dict() for user in users]
+    return jsonify(users), 200
     return {"message": "You are not authorized to view this page"}, 403
 
 # create admin routes that let me access to all cars, all invoices, all entries and exits and all users
@@ -311,3 +364,69 @@ def get_cars():
             cars = [car.to_dict() for car in cars]
             return jsonify(cars), 200
     return {"message": "You are not authorized to view this page"}, 403
+
+
+from bib import get_entree_sortie
+# create a route the will synchronize 
+@app.route('/syncES', methods=['POST'])
+def sync():
+    # if 'logged_in' in session and session['logged_in']:
+    #     if session['user_id'] == 1:
+    #         # get all the cars from the mongo database
+    try:
+        get_entree_sortie()
+        return {"message": "Synchronized successfully"}, 200
+    except:
+        return {"message": "An error occured"}, 500
+    
+@app.route('/syncFactures', methods=['POST'])
+def syncFactures():
+    # Connection string for a local MongoDB instance
+    uri = "mongodb://localhost:27017/"
+
+    # Create a new client and connect to the server
+    client = MongoClient(uri, server_api=ServerApi('1'))
+
+    # Access the database and collection
+    database = client['parkingDB']
+    entree_sortie = database['entree__sortie']
+    factures = database['factures2']
+
+    # Get all documents from entree__sortie
+    documents = entree_sortie.find()
+
+    for document in documents:
+        # Calculate the difference in minutes between heure_entree and heure_sortie
+        if isinstance(document['heure_entree'], datetime) and isinstance(document['heure_sortie'], datetime):
+            heure_entree = document['heure_entree']
+            heure_sortie = document['heure_sortie']
+        else:
+            # Convert heure_entree and heure_sortie to datetime objects
+            heure_entree = datetime.strptime(document['heure_entree'], "%Y-%m-%d %H:%M:%S.%f")
+            heure_sortie = datetime.strptime(document['heure_sortie'], "%Y-%m-%d %H:%M:%S.%f")
+        time_difference = (heure_sortie - heure_entree).total_seconds() / 60
+
+        # Apply the appropriate tariff based on the time difference
+        if time_difference < 30:
+            tarif = 1.8
+        elif 30 <= time_difference < 60:
+            tarif = 1.6
+        else:
+            tarif = 1.2
+
+        # Calculate the total cost
+        total_cost = time_difference * tarif
+
+        # Create an invoice for the document
+        facture = {
+            'numero_immatriculation': document['numero_immatriculation'],
+            'heure_entree': document['heure_entree'],
+            'heure_sortie': document['heure_sortie'],
+            'tarif': tarif,
+            'total_cost': total_cost
+        }
+
+        # Insert the invoice into the factures collection
+        factures.insert_one(facture)
+
+    return {"message": "Invoices synced successfully"}, 200

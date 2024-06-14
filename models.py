@@ -7,6 +7,7 @@ class Utilisateur(db.Model):
     mot_de_passe = db.Column(db.String(255), nullable=False)
     numero_de_telephone = db.Column(db.String(40), nullable=False)
     information_bancaires = db.Column(db.String(255), nullable=True)
+    solde = db.Column(db.Integer, nullable=True)
     def to_dict(self):
         return {
             'id': self.id,
@@ -14,6 +15,7 @@ class Utilisateur(db.Model):
             'email': self.email,
             'numero_de_telephone': self.numero_de_telephone,
             'information_bancaires': self.information_bancaires,
+            'solde' : self.solde
         }
 
 class Facture(db.Model):
