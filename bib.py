@@ -175,11 +175,11 @@ def sync_factures():
             heure_sortie = datetime.strptime(document['heure_sortie'], "%Y-%m-%d %H:%M:%S.%f")
         time_difference = (heure_sortie - heure_entree).total_seconds() / 60
         if time_difference < 30:
-            tarif = 1.8
+            tarif = 10
         elif 30 <= time_difference < 60:
-            tarif = 1.6
+            tarif = 8
         else:
-            tarif = 1.2
+            tarif = 6
         total_cost = time_difference * tarif
         uid = get_user_id(document['numero_immatriculation'])
         facture = {
