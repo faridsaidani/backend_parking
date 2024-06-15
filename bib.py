@@ -99,10 +99,18 @@ def get_entree_sortie():
     uri = "mongodb://localhost:27017/?retryWrites=true&w=majority"
     client = MongoClient(uri)
     db = client['parkingDB']
-    collection = db['entree__sortie']
-
-    collection.insert_many(documents)
-
+    local_collection = db['entree__sortie']
+    
+    for document in documents:
+        try:
+            existing_document = local_collection.find_one({'_id': document['_id']})
+            if existing_document is not None:
+                print(f"A document with _id {document['_id']} already exists.")
+            else:
+                local_collection.insert_one(document)
+        except Exception as e:
+            print(e)
+    print("Data migrated successfully from MongoDB to MongoDB.")
 def get_user_id(numero_immatriculation):
     # Connection string for a local MongoDB instance
     uri = "mongodb://localhost:27017/"
@@ -149,6 +157,16 @@ def sync_factures():
     factures = database['facture']
     documents = entree_sortie.find()
     for document in documents:
+        if 'heure_sortie' not in document.keys():
+            continue
+        existing_facture = factures.find_one({
+            'numero_immatriculation': document['numero_immatriculation'],
+            'heure_entree': document['heure_entree'],
+            'heure_sortie': document['heure_sortie']
+        })
+        if existing_facture is not None:
+            continue  # Skip this iteration if the facture already exists
+
         if isinstance(document['heure_entree'], datetime) and isinstance(document['heure_sortie'], datetime):
             heure_entree = document['heure_entree']
             heure_sortie = document['heure_sortie']
@@ -173,8 +191,8 @@ def sync_factures():
             'total_cost': total_cost,
             'regle' : False
         }
+        
         factures.insert_one(facture)
-
 def migrate_data(collection_name, uri):
     data = export_mongo_to_json(collection_name)
     print(data)

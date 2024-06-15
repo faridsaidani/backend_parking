@@ -257,7 +257,10 @@ def pay_invoice(id, id_invoice, sum):
     invoice = Facture.objects(id=id_invoice).first()
     if not invoice:
         return jsonify({'message': 'Invoice not found'}), 404
-
+    # if sum is float then convert it to int
+    if '.' in sum:
+        sum = sum.split('.')[0]
+        
     sum = int(sum)
     # Check if the user has enough balance to pay the invoice
     if user.solde < sum:
