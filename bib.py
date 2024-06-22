@@ -106,6 +106,13 @@ def get_entree_sortie():
             existing_document = local_collection.find_one({'_id': document['_id']})
             if existing_document is not None:
                 print(f"A document with _id {document['_id']} already exists.")
+                if 'heure_sortie' not in existing_document:
+                    # Update the document to add 'heure_sortie'
+                    update_result = local_collection.update_one(
+                        {'_id': document['_id']},
+                        {'$set': {'heure_sortie': document.get('heure_sortie', 'default_value')}}
+                    )
+                    print(f"Updated document {document['_id']} to add heure_sortie. Modified count: {update_result.modified_count}")
             else:
                 local_collection.insert_one(document)
         except Exception as e:
